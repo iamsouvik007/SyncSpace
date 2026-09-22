@@ -1,6 +1,6 @@
-# Slack Clone — Real-Time Team Collaboration Platform
+# SyncSpace — Real-Time Team Collaboration Platform
 
-A full-stack team collaboration and messaging application built with a modern React client and an event-driven Node.js / Express backend. The platform supports workspace management, channel-based discussions, real-time messaging using WebSockets, rich-text messaging with image uploads via AWS S3 pre-signed URLs, background job processing with BullMQ and Redis, and subscription checkout powered by Razorpay.
+A full-stack team collaboration and messaging application built with a modern React client and an event-driven Node.js / Express backend. The platform supports workspace management, channel-based discussions, real-time messaging using WebSockets, rich-text messaging with image uploads via AWS S3 pre-signed URLs, background email processing with Bull and Redis, and Razorpay payment checkout.
 
 ---
 
@@ -37,7 +37,7 @@ A full-stack team collaboration and messaging application built with a modern Re
 
 The system is organized into a decoupled monorepo structure:
 - **`Message-Slack-Frontend/`**: React 18 single-page application built on Vite. Leverages Radix UI and Tailwind CSS for accessible design, TanStack Query (v5) for server-state caching, Quill for rich-text input, and Socket.IO client for live channel feeds.
-- **`Messaging-Slack-Backend/`**: Modular Express service structured using a strict Layered Architecture (`Routes` &rarr; `Controllers` &rarr; `Services` &rarr; `Repositories` &rarr; `Mongoose Models`). Includes Bull job queues backed by Redis, AWS S3 presigned URL generation, and Bull-Board administration.
+- **`Messaging-Slack-Backend/`**: Modular Express service using a layered architecture (`Routes` &rarr; `Controllers` &rarr; `Services` &rarr; `Repositories` &rarr; `Mongoose Models`). Includes Bull job queues backed by Redis, AWS S3 presigned URL generation, and Bull-Board administration.
 
 ---
 
@@ -46,18 +46,18 @@ The system is organized into a decoupled monorepo structure:
 - **Workspaces & Multi-Tenancy**:
   - Create and manage independent team workspaces.
   - Role-based membership (`admin` vs. `member`).
-  - Join code generator and reset capabilities for frictionless onboarding.
-  - Email invitations dispatched asynchronously via BullMQ worker queues.
+  - Join-code generation and reset capabilities for workspace entry.
+  - Email notifications dispatched asynchronously when an admin adds a member to a workspace.
 - **Channels & Discussions**:
-  - Default `#general` channel automatically created on workspace provision.
-  - Custom public channels inside workspaces.
+  - A default `general` channel automatically created with each workspace.
+  - Custom channels inside workspaces.
 - **Real-Time Messaging**:
   - WebSocket room-based message broadcasting (`JoinChannel`, `NewMessage`, `NewMessageReceived`).
   - Reverse-chronological message history with paginated retrieval.
 - **Rich-Text Editor & Attachments**:
   - Quill-powered editor supporting bold, italic, lists, and formatted code blocks.
   - Direct client-to-cloud image uploads using AWS S3 pre-signed URLs.
-- **Payments & Billing**:
+- **Payments**:
   - Razorpay order creation and HMAC-SHA256 signature verification.
 - **Queue Dashboard**:
   - Built-in Bull-Board dashboard at `/ui` to observe, retry, or inspect background email tasks in real time.
@@ -93,7 +93,7 @@ The system is organized into a decoupled monorepo structure:
 ## Directory Layout
 
 ```
-Message-Slack/
+SyncSpace/
 ├── Message-Slack-Frontend/
 │   ├── src/
 │   │   ├── apis/            # Axios API client functions (auth, workspaces, channels, s3, payments)
@@ -121,7 +121,7 @@ Message-Slack/
 │   │   ├── routes/          # REST API route declarations (v1)
 │   │   ├── schema/          # Mongoose database models (User, Workspace, Channel, Message, Payment)
 │   │   ├── services/        # Business logic layer
-│   │   ├── utils/           # Error classes, response formatters, email templates
+│   │   ├── utils/           # Error classes, response formatters, auth and email helpers
 │   │   ├── validators/      # Zod validation schemas
 │   │   └── index.js         # HTTP server and Socket.IO initialization
 │   ├── .env.example         # Backend environment template
@@ -136,7 +136,7 @@ Message-Slack/
 
 ### Prerequisites
 Make sure you have the following installed locally:
-- **Node.js**: v18+ (tested on Node v20/v24)
+- **Node.js**: v18+
 - **npm**: v9+
 - **MongoDB**: Running locally on `mongodb://localhost:27017` or a MongoDB Atlas URI
 - **Redis**: Running locally on `localhost:6379` (required for background queues)
@@ -244,6 +244,11 @@ All protected routes require the `x-access-token` header containing a valid JWT.
 | `POST` | `/signup` | Register a new user account | No |
 | `POST` | `/signin` | Login and obtain JWT token | No |
 
+### Membership (`/api/v1/members`)
+| Method | Endpoint | Description | Auth Required |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/workspace/:workspaceId` | Check whether the current user belongs to a workspace | Yes |
+
 ### Workspaces (`/api/v1/workspaces`)
 | Method | Endpoint | Description | Auth Required |
 | :--- | :--- | :--- | :--- |
@@ -252,7 +257,7 @@ All protected routes require the `x-access-token` header containing a valid JWT.
 | `GET` | `/:workspaceId` | Fetch workspace details with channels & members | Yes |
 | `PUT` | `/:workspaceId` | Update workspace metadata | Yes (Admin) |
 | `DELETE` | `/:workspaceId` | Delete workspace and its channels | Yes (Admin) |
-| `GET` | `/join/:joinCode` | Look up a workspace by its join code | Yes |
+| `GET` | `/join/:joinCode` | Retrieve an accessible workspace by its join code | Yes |
 | `PUT` | `/:workspaceId/join` | Join workspace with a join code | Yes |
 | `PUT` | `/:workspaceId/members` | Add a member directly to workspace | Yes (Admin) |
 | `PUT` | `/:workspaceId/channels` | Create a new channel inside workspace | Yes (Admin) |

@@ -745,13 +745,6 @@ npm run build     # Production bundle
 npm run preview   # Preview production build locally
 npm run lint      # eslint .
 ```
-
----
-
-## 📄 License
-
-This project is licensed under the [ISC License](LICENSE).
-
 ---
 
 <div align="center">
